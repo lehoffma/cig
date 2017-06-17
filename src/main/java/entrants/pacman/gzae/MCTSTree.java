@@ -35,6 +35,8 @@ public class MCTSTree {
                 -1,
                 MOVE.NEUTRAL
         )); */
+
+       // initialize ghosts with the information we have
         for (int i=0;i<Constants.GHOST.values().length;++i)
         {
             if (Debug)
@@ -94,7 +96,7 @@ public class MCTSTree {
     }
 
 
-
+    // similar to best Move but return the score
     public double getBestScore(){
         double bestScore = -1;
 

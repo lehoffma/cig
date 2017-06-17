@@ -1,9 +1,7 @@
 
 import entrants.pacman.gzae.MyPacMan;
-import examples.StarterGhostComm.Blinky;
-import examples.StarterGhostComm.Inky;
-import examples.StarterGhostComm.Pinky;
-import examples.StarterGhostComm.Sue;
+import entrants.ghosts.gzae.*;
+
 import pacman.Executor;
 import pacman.controllers.IndividualGhostController;
 import pacman.controllers.MASController;

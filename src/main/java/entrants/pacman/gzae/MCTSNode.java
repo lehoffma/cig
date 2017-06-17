@@ -41,7 +41,7 @@ public class MCTSNode {
             for (int j = 0; j < maximalLookahead; j++){
                 // Repeat simulation till we find the next junction
                 while(!forwardCopy.isJunction(forwardCopy.getPacmanCurrentNodeIndex())){
-                    forwardCopy.advanceGame(MyPacMan.nonJunctionSim(forwardCopy), ghosts.getMove(forwardCopy.copy(), 40));
+                    forwardCopy.advanceGame(MyPacMan.nonJunctionSimStatic(forwardCopy), ghosts.getMove(forwardCopy.copy(), 40));
                 }
 
                 // once again leave the junction before extending the simulation

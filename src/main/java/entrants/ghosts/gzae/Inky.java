@@ -5,14 +5,10 @@ import pacman.game.Constants;
 import pacman.game.Game;
 
 
-public class Inky extends IndividualGhostController {
+public class Inky extends GenericGhost {
 
     public Inky() {
         super(Constants.GHOST.INKY);
     }
 
-    @Override
-    public Constants.MOVE getMove(Game game, long timeDue) {
-        return null;
-    }
 }

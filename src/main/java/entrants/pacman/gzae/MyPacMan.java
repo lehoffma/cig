@@ -1,6 +1,7 @@
 package entrants.pacman.gzae;
 
 import java.util.Arrays;
+import java.util.LinkedList;
 
 import pacman.controllers.PacmanController;
 import pacman.game.Constants;
@@ -17,6 +18,7 @@ public class MyPacMan extends PacmanController {
 
     private static final byte SEEN_THRESHOLD = 10;
     private static final int GAME_SCORE_THRESHOLD = 20;
+    private static final int DISTANCE_THRESHOLD = 3;
 
 
     private int[] ghostPos = {-1,-1,-1,-1};
@@ -29,19 +31,25 @@ public class MyPacMan extends PacmanController {
         int myNodeIndex = game.getPacmanCurrentNodeIndex();
 
 
+        // for every ghost
         for (int i=0;i<ghostPos.length;++i) {
+
+            // Try to get Ghost Information
             int pos = game.getGhostCurrentNodeIndex(getGhost(i));
             int edible = game.getGhostEdibleTime(getGhost(i));
 
+            // One Timestep later, so increase the last seen and decrease the edibleTime
             lastSeen[i]++;
             if (edibleTime[i]>0) edibleTime[i]--;
 
+            // if we found a ghost, update infos
             if (pos!=-1) {
                 ghostPos[i] = pos;
                 edibleTime[i]=edible;
                 lastSeen[i]= 0;
             }
 
+            // if not seen for a long time
             if(lastSeen[i]>SEEN_THRESHOLD) {
                 ghostPos[i] = -1;
             }
@@ -57,24 +65,53 @@ public class MyPacMan extends PacmanController {
         } else {
             // follow along the path
             return nonJunctionSim(game);
+
         }
 
     }
 
-    public static MOVE nonJunctionSim(Game game){
+    private MOVE nonJunctionSim(Game game){
         // get the current position of PacMan (returns -1 in case you can't see PacMan)
         int myNodeIndex = game.getPacmanCurrentNodeIndex();
 
         // get all possible moves at the queried position
         MOVE[] myMoves = game.getPossibleMoves(myNodeIndex);
+        LinkedList<MOVE> myMoves2 = new LinkedList<>();
+        int[] distances = new int[myMoves.length];
+
+
+        for (int i=0;i<myMoves.length;++i) {
+            int idx = game.getNeighbour(myNodeIndex,myMoves[i]);
+            distances[i]= 9999;
+            System.out.println("Pos:" + idx);
+            for (int j=0;j<ghostPos.length;++j){
+
+                if (ghostPos[j]>=0&&edibleTime[j]==0)
+                    distances[i] = Math.min(distances[i], (int) game.getDistance(idx,ghostPos[j], Constants.DM.PATH));
+            }
+
+            if (distances[i]>DISTANCE_THRESHOLD){
+                myMoves2.add(myMoves[i]);
+            }
+            System.out.println(myMoves2);
+
+        }
+        if (myMoves2.isEmpty())
+        {
+            for (MOVE m:myMoves) {
+                myMoves2.add(m);
+
+            }
+        }
+        if (myMoves2.size()==1) return myMoves2.get(0);
 
         MOVE lastMove = game.getPacmanLastMoveMade();
-        if (Arrays.asList(myMoves).contains(lastMove)){
+        if (myMoves2.contains(lastMove)){
             return lastMove;
         }
 
         // don't go back (corner)
-        for (MOVE move : myMoves){
+        for (MOVE move : myMoves2){
             if (move != lastMove.opposite()){
                 return move;
             }
@@ -94,7 +131,11 @@ public class MyPacMan extends PacmanController {
         // create MCTSTree object for simulation
         MCTSTree tree = new MCTSTree(game,ghostPos,edibleTime);
         tree.simulate(timeDue);
+
+
         System.out.println("Tree: "+ tree.getBestScore()+" Game:" + (game.getScore() + game.getPacmanNumberOfLivesRemaining()*1000));
+
+        // if sim result is better than current situation
         if (tree.getBestScore()> (GAME_SCORE_THRESHOLD + game.getScore() + game.getPacmanNumberOfLivesRemaining()*1000))
             return tree.getBestMove();
         else {
@@ -117,5 +158,29 @@ public class MyPacMan extends PacmanController {
             default:
                 return null;
         }
+    }
+
+
+    public static MOVE nonJunctionSimStatic(Game game){
+        // get the current position of PacMan (returns -1 in case you can't see PacMan)
+        int myNodeIndex = game.getPacmanCurrentNodeIndex();
+
+        // get all possible moves at the queried position
+        MOVE[] myMoves = game.getPossibleMoves(myNodeIndex);
+
+        MOVE lastMove = game.getPacmanLastMoveMade();
+        if (Arrays.asList(myMoves).contains(lastMove)){
+            return lastMove;
+        }
+
+        // don't go back (corner)
+        for (MOVE move : myMoves){
+            if (move != lastMove.opposite()){
+                return move;
+            }
+        }
+
+        // default
+        return lastMove.opposite();
     }
 }

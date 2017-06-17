@@ -4,15 +4,10 @@ import pacman.controllers.IndividualGhostController;
 import pacman.game.Constants;
 import pacman.game.Game;
 
-public class Blinky extends IndividualGhostController {
+public class Blinky extends GenericGhost {
 
 
     public Blinky() {
-        super(Constants.GHOST.BLINKY);
-    }
+        super(Constants.GHOST.BLINKY); }
 
-    @Override
-    public Constants.MOVE getMove(Game game, long timeDue) {
-        return null;
-    }
 }
