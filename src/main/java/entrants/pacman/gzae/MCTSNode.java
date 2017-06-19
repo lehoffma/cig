@@ -1,75 +1,66 @@
 package entrants.pacman.gzae;
 
-/**
- * Created by Gzae on 17.06.2017.
- */
+import pacman.controllers.MASController;
+import pacman.game.Constants.MOVE;
+import pacman.game.Game;
 
-        import pacman.game.Game;
-
-        import java.util.Random;
-
-        import pacman.controllers.MASController;
-        import pacman.game.Constants.MOVE;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Random;
 
 
 public class MCTSNode {
-
     public MOVE move;
     public double score;
-    public static Random random = new Random();
+    private static Random random = new Random();
 
-    public MCTSNode(MOVE move){
+    public MCTSNode(MOVE move) {
         this.move = move;
         this.score = -1;
     }
 
     @Override
-    public String toString(){
+    public String toString() {
         return "<Node: previous_move = " + this.move.name() +
                 "; score = " + this.score;
     }
 
-    public void doSimulations(Game game, MASController ghosts, int simulations, int maximalLookahead){
-        double[] scores = new double[simulations];
-
-        for (int i = 0; i < simulations; i++){
-            Game forwardCopy = game.copy();
-
+    public void doSimulations(Game game, MASController ghosts, int simulations, int maximalLookahead) {
+        List<Double> scores = new ArrayList<>();
+        for (int i = 0; i < simulations; i++) {
+            Game gameCopy = game.copy();
             // Have to forward once before the loop - so that we aren't on a junction
-            forwardCopy.advanceGame(move, ghosts.getMove(forwardCopy.copy(), 40));
+            gameCopy.advanceGame(move, ghosts.getMove(gameCopy.copy(), 40));
 
-            for (int j = 0; j < maximalLookahead; j++){
+            for (int j = 0; j < maximalLookahead; j++) {
                 // Repeat simulation till we find the next junction
-                while(!forwardCopy.isJunction(forwardCopy.getPacmanCurrentNodeIndex())){
-                    forwardCopy.advanceGame(MyPacMan.nonJunctionSimStatic(forwardCopy), ghosts.getMove(forwardCopy.copy(), 40));
+                while (!gameCopy.isJunction(gameCopy.getPacmanCurrentNodeIndex())) {
+                    gameCopy.advanceGame(MyPacMan.nonJunctionSim(gameCopy, new int[]{}, new int[]{}),
+                            ghosts.getMove(gameCopy.copy(), 40));
                 }
 
                 // once again leave the junction before extending the simulation
-                MOVE[] possibleMoves = forwardCopy.getPossibleMoves(forwardCopy.getPacmanCurrentNodeIndex());
-                forwardCopy.advanceGame(possibleMoves[random.nextInt(possibleMoves.length)],
-                        ghosts.getMove(forwardCopy.copy(), 40));
+                MOVE[] possibleMoves = gameCopy.getPossibleMoves(gameCopy.getPacmanCurrentNodeIndex());
+                gameCopy.advanceGame(possibleMoves[random.nextInt(possibleMoves.length)],
+                        ghosts.getMove(gameCopy.copy(), 40));
             }
 
-            scores[i] = getValue(forwardCopy);
+            scores.add(this.getValue(gameCopy));
         }
 
-        this.score = mean(scores);
+        //calculate mean of all scores
+        this.score = scores.stream().reduce(0.0, (acc, score) -> acc + score) / scores.size();
     }
 
-
-    public static double mean(double[] m) {
-        double sum = 0;
-        for (int i = 0; i < m.length; i++) {
-            sum += m[i];
-        }
-        return sum / m.length;
+    /**
+     * The value function for the monte carlo tree search.
+     *
+     * @param game
+     * @return
+     */
+    public double getValue(Game game) {
+        return game.getScore() + game.getPacmanNumberOfLivesRemaining() * 1000;
     }
-
-
-    public double getValue(Game game){
-        return game.getScore() + game.getPacmanNumberOfLivesRemaining()*1000;
-    }
-
 
 
 }

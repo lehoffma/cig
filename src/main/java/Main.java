@@ -9,10 +9,6 @@ import pacman.game.Constants.*;
 
 import java.util.EnumMap;
 
-
-/**
- * Created by pwillic on 06/05/2016.
- */
 public class Main {
 
     public static void main(String[] args) {
