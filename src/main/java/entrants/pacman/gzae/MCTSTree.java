@@ -8,9 +8,7 @@ import pacman.game.Game;
 import pacman.game.info.GameInfo;
 import pacman.game.internal.Ghost;
 
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.List;
+import java.util.*;
 import java.util.stream.Collectors;
 
 public class MCTSTree {
@@ -24,21 +22,21 @@ public class MCTSTree {
 
     private static final boolean DEBUG = false;
 
-    public MCTSTree(Game game, int[] ghostPos, int[] edibleTime) {
+    public MCTSTree(Game game, Map<Constants.GHOST, GhostInfo> ghostInfos) {
         Game completelyObservableGame;
         GameInfo info = game.getPopulatedGameInfo();
 
         // initialize ghosts with the information we have
-        for (int i = 0; i < Constants.GHOST.values().length; ++i) {
-            if (DEBUG) {
-                System.out.println("i: " + i + " Pos: " + ghostPos[i] + " edibleTime: " + edibleTime[i]);
-            }
+        Arrays.stream(Constants.GHOST.values()).forEach(ghost -> {
+            int ghostPos = Optional.ofNullable(ghostInfos.get(ghost))
+                    .map(GhostInfo::getGhostPos)
+                    .filter(pos -> pos >= 0)
+                    .orElse(game.getCurrentMaze().lairNodeIndex);
+            int edibleTime = Optional.ofNullable(ghostInfos.get(ghost)).map(GhostInfo::getEdibleTime).orElse(0);
 
-            info.setGhost(Util.getGhostByIndex(i),
-                    new Ghost(Util.getGhostByIndex(i),
-                            ghostPos[i] >= 0 ? ghostPos[i] : game.getCurrentMaze().lairNodeIndex, edibleTime[i],
-                            -1, MOVE.NEUTRAL));
-        }
+            info.setGhost(ghost, new Ghost(ghost, ghostPos, edibleTime, -1, MOVE.NEUTRAL));
+        });
+
         completelyObservableGame = game.getGameFromInfo(info);
 
         this.game = completelyObservableGame;

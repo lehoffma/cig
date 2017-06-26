@@ -5,17 +5,21 @@ import pacman.controllers.IndividualGhostController;
 import pacman.game.Constants;
 import pacman.game.Game;
 import pacman.game.comms.BasicMessage;
-import pacman.game.comms.Message;
 import pacman.game.comms.Messenger;
+
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 
 
 public class GenericGhost extends IndividualGhostController {
-    private int[] ghostPos = {-1, -1, -1, -1};
-    private int[] messageTick = {-1, -1, -1, -1};
+    private Map<Constants.GHOST, Integer> ghostPositions = new HashMap<>();
 
-    private int TICK_THRESHOLD = 20;
+    private final int TICK_THRESHOLD = 30;
     private int lastPacmanIndex = -1;
     private int tickSeen = -1;
+    private int pacmanLives = -1;
 
     private int currentJunctionIndex = -1;
 
@@ -23,6 +27,49 @@ public class GenericGhost extends IndividualGhostController {
         super(ghostType);
     }
 
+    /**
+     * @param game
+     * @param ownNodeIndex
+     * @param pacmanIndex
+     * @return
+     */
+    private List<BasicMessage> getMessages(Game game, int ownNodeIndex, int pacmanIndex) {
+        List<BasicMessage> messages = new ArrayList<>();
+        //send own position
+        messages.add(new BasicMessage(ghost, null, BasicMessage.MessageType.I_AM, ownNodeIndex,
+                game.getCurrentLevelTime()));
+
+        //we see pacman
+        if (pacmanIndex != -1) {
+            messages.add(new BasicMessage(ghost, null, BasicMessage.MessageType.PACMAN_SEEN, pacmanIndex,
+                    game.getCurrentLevelTime()));
+        }
+
+        return messages;
+    }
+
+    /**
+     * @param messenger
+     * @param currentTick
+     */
+    private void readMessages(Messenger messenger, int currentTick) {
+        messenger.getMessages(ghost).forEach(message -> {
+            switch (message.getType()) {
+                case I_AM:
+                    // receive positions
+                    ghostPositions.put(message.getSender(), message.getData());
+                    break;
+                // Has anybody else seen PacMan if we haven't?
+                case PACMAN_SEEN:
+                    // Only update pacman info if it is newer information
+                    if (message.getTick() > tickSeen && message.getTick() < currentTick) {
+                        lastPacmanIndex = message.getData();
+                        tickSeen = message.getTick();
+                    }
+                    break;
+            }
+        });
+    }
 
     /**
      * @param game
@@ -35,8 +82,10 @@ public class GenericGhost extends IndividualGhostController {
         int edibleTime = game.getGhostEdibleTime(ghost);
         int currentTick = game.getCurrentLevelTime();
 
-        //reset pacman info if nobody has seen him in a while
-        if (currentTick <= 2 || currentTick - tickSeen >= TICK_THRESHOLD) {
+        //reset pacman info if nobody has seen him in a while or if pacman died since we last called this method
+        if (currentTick <= 2 || currentTick - tickSeen >= TICK_THRESHOLD
+                || pacmanLives > game.getPacmanNumberOfLivesRemaining()) {
+            pacmanLives = game.getPacmanNumberOfLivesRemaining();
             lastPacmanIndex = -1;
             tickSeen = -1;
         }
@@ -45,50 +94,25 @@ public class GenericGhost extends IndividualGhostController {
         if (this.currentJunctionIndex == -1) {
             int amountOfJunctions = game.getCurrentMaze().junctionIndices.length - 1;
             this.currentJunctionIndex = amountOfJunctions / (Util.getGhostIndex(ghost) + 1);
-            System.out.println(this.currentJunctionIndex);
         }
 
         // Can we see PacMan? If so tell people and update our info
         int pacmanIndex = game.getPacmanCurrentNodeIndex();
         int currentIndex = game.getGhostCurrentNodeIndex(ghost);
         Messenger messenger = game.getMessenger();
-        if (messenger != null) {
-            // Send my Pos
-            messenger.addMessage(new BasicMessage(ghost, null, BasicMessage.MessageType.I_AM, currentIndex,
-                    game.getCurrentLevelTime()));
-            ghostPos[Util.getGhostIndex(ghost)] = currentIndex;
 
-            //we see pacman
-            if (pacmanIndex != -1) {
-                lastPacmanIndex = pacmanIndex;
-                tickSeen = game.getCurrentLevelTime();
-                messenger.addMessage(new BasicMessage(ghost, null, BasicMessage.MessageType.PACMAN_SEEN, pacmanIndex,
-                        game.getCurrentLevelTime()));
-            } else {
-                // Has anybody else seen PacMan if we haven't?
-                for (Message message : messenger.getMessages(ghost)) {
-                    switch (message.getType()) {
-                        case I_AM:
-                            // receive positions
-                            int sender = Util.getGhostIndex(message.getSender());
-                            if (message.getTick() > messageTick[sender] && message.getTick() < currentTick)
-                                messageTick[sender] = message.getTick();
-                            ghostPos[sender] = message.getData();
-                            break;
-                        case PACMAN_SEEN:
-                            // Only update pacman info if it is newer information
-                            if (message.getTick() > tickSeen && message.getTick() < currentTick) {
-                                lastPacmanIndex = message.getData();
-                                tickSeen = message.getTick();
-                            }
-                            break;
-                    }
-                }
-            }
+        //update our own and pacman's position
+        ghostPositions.put(ghost, currentIndex);
+        if (pacmanIndex != -1) {
+            lastPacmanIndex = pacmanIndex;
+            tickSeen = game.getCurrentLevelTime();
         }
-        //todo?
-        if (pacmanIndex == -1) {
-            pacmanIndex = lastPacmanIndex;
+
+        //handle messages
+        if (messenger != null) {
+            //send messages
+            this.getMessages(game, currentIndex, pacmanIndex).forEach(messenger::addMessage);
+            this.readMessages(messenger, currentTick);
         }
 
         Boolean requiresAction = game.doesGhostRequireAction(ghost);
@@ -113,7 +137,13 @@ public class GenericGhost extends IndividualGhostController {
      */
     private Constants.MOVE runAway(Game game) {
         if (lastPacmanIndex >= 0) {
-            return game.getNextMoveAwayFromTarget(this.getOwnNodeIndex(), lastPacmanIndex, Constants.DM.PATH);
+            return game.getApproximateNextMoveAwayFromTarget(this.getOwnNodeIndex(), lastPacmanIndex,
+                    game.getGhostLastMoveMade(ghost), Constants.DM.PATH);
+        }
+        //move towards the lair if not already there
+        if (game.getDistance(this.getOwnNodeIndex(), game.getCurrentMaze().lairNodeIndex, Constants.DM.PATH) > 10) {
+            return game.getApproximateNextMoveAwayFromTarget(this.getOwnNodeIndex(), game.getCurrentMaze().lairNodeIndex,
+                    game.getGhostLastMoveMade(ghost), Constants.DM.PATH);
         }
         return Constants.MOVE.NEUTRAL;
     }
@@ -138,14 +168,15 @@ public class GenericGhost extends IndividualGhostController {
             currentJunctionIndex = (currentJunctionIndex + 1) % game.getJunctionIndices().length;
         }
         int nextJunctionPosition = game.getJunctionIndices()[currentJunctionIndex];
-        return game.getNextMoveTowardsTarget(this.getOwnNodeIndex(), nextJunctionPosition, Constants.DM.PATH);
+        return game.getApproximateNextMoveTowardsTarget(this.getOwnNodeIndex(), nextJunctionPosition,
+                game.getGhostLastMoveMade(ghost), Constants.DM.PATH);
     }
 
     /**
      * @return
      */
     private int getOwnNodeIndex() {
-        return ghostPos[Util.getGhostIndex(ghost)];
+        return ghostPositions.get(ghost);
     }
 }
 

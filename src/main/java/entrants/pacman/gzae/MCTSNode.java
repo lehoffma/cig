@@ -5,6 +5,7 @@ import pacman.game.Constants.MOVE;
 import pacman.game.Game;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Random;
 
@@ -35,7 +36,7 @@ public class MCTSNode {
             for (int j = 0; j < maximalLookahead; j++) {
                 // Repeat simulation till we find the next junction
                 while (!gameCopy.isJunction(gameCopy.getPacmanCurrentNodeIndex())) {
-                    gameCopy.advanceGame(MyPacMan.nonJunctionSim(gameCopy, new int[]{}, new int[]{}),
+                    gameCopy.advanceGame(MyPacMan.nonJunctionSim(gameCopy, new HashMap<>()),
                             ghosts.getMove(gameCopy.copy(), 40));
                 }
 

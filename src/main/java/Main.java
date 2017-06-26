@@ -1,11 +1,13 @@
 
+import entrants.ghosts.gzae.Blinky;
+import entrants.ghosts.gzae.Inky;
+import entrants.ghosts.gzae.Pinky;
+import entrants.ghosts.gzae.Sue;
 import entrants.pacman.gzae.MyPacMan;
-import entrants.ghosts.gzae.*;
-
 import pacman.Executor;
 import pacman.controllers.IndividualGhostController;
 import pacman.controllers.MASController;
-import pacman.game.Constants.*;
+import pacman.game.Constants.GHOST;
 
 import java.util.EnumMap;
 

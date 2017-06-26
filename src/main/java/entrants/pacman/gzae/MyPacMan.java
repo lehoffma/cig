@@ -6,7 +6,9 @@ import pacman.game.Constants.MOVE;
 import pacman.game.Game;
 
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
@@ -20,61 +22,64 @@ public class MyPacMan extends PacmanController {
 
     private static final byte SEEN_THRESHOLD = 10;
     private static final int GAME_SCORE_THRESHOLD = 20;
-    private static final int DISTANCE_THRESHOLD = 10;
+    private static final int DISTANCE_THRESHOLD = 7;
 
+    private Map<Constants.GHOST, GhostInfo> ghostInfos = new HashMap<>();
 
-    private int[] ghostPos = {-1, -1, -1, -1};
-    private byte[] lastSeen = {0, 0, 0, 0};
-    private int[] edibleTime = {0, 0, 0, 0};
+    public MyPacMan(){
+        Arrays.stream(Constants.GHOST.values()).forEach(ghost -> ghostInfos.put(ghost, new GhostInfo()));
+    }
 
     public MOVE getMove(Game game, long timeDue) {
         // we will only simulate the next moves in a junction,
         // otherwise we will walk straight along the hallway
         int myNodeIndex = game.getPacmanCurrentNodeIndex();
 
+        //update the ghost's information stored in the map
+        ghostInfos = ghostInfos.entrySet().stream()
+                .map(ghostInfoEntry -> {
+                    GhostInfo ghostInfo = ghostInfoEntry.getValue();
+                    // Try to get Ghost Information
+                    int ghostPosition = game.getGhostCurrentNodeIndex(ghostInfoEntry.getKey());
+                    int edibleTime = game.getGhostEdibleTime(ghostInfoEntry.getKey());
 
-        // for every ghost
-        for (int ghostIndex = 0; ghostIndex < ghostPos.length; ghostIndex++) {
+                    ghostInfo.incrementLastSeen();
+                    if(ghostInfo.getEdibleTime() > 0){
+                        ghostInfo.setEdibleTime(ghostInfo.getEdibleTime()-1);
+                    }
 
-            // Try to get Ghost Information
-            int ghostPosition = game.getGhostCurrentNodeIndex(Util.getGhostByIndex(ghostIndex));
-            int edibleTime = game.getGhostEdibleTime(Util.getGhostByIndex(ghostIndex));
+                    // if we found a ghost, update infos
+                    if (ghostPosition != -1) {
+                        ghostInfo.setGhostPos(ghostPosition)
+                                .setEdibleTime(edibleTime)
+                                .setLastSeen((byte) 0);
+                    }
 
-            // One Timestep later, so increase the last seen and decrease the edibleTime
-            lastSeen[ghostIndex]++;
-            if (this.edibleTime[ghostIndex] > 0) {
-                this.edibleTime[ghostIndex]--;
-            }
+                    // if not seen for a long time
+                    if(ghostInfo.getLastSeen() > SEEN_THRESHOLD){
+                        ghostInfo.setGhostPos(-1);
+                    }
+                    ghostInfoEntry.setValue(ghostInfo);
+                    return ghostInfoEntry;
+                })
+                .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
 
-            // if we found a ghost, update infos
-            if (ghostPosition != -1) {
-                ghostPos[ghostIndex] = ghostPosition;
-                this.edibleTime[ghostIndex] = edibleTime;
-                lastSeen[ghostIndex] = 0;
-            }
-
-            // if not seen for a long time
-            if (lastSeen[ghostIndex] > SEEN_THRESHOLD) {
-                ghostPos[ghostIndex] = -1;
-            }
-
-        }
 
         if (game.isJunction(myNodeIndex)) {
             // return best direction determined through MCTS
             return mcts(game, timeDue);
         }
         // follow along the path
-        return nonJunctionSim(game, this.ghostPos, this.edibleTime);
+        return nonJunctionSim(game, ghostInfos);
     }
 
     /**
+     *
      * @param game
-     * @param ghostPositions
-     * @param edibleTime
+     * @param ghostInfos
      * @return
      */
-    public static MOVE nonJunctionSim(Game game, int[] ghostPositions, int[] edibleTime) {
+    public static MOVE nonJunctionSim(Game game, Map<Constants.GHOST, GhostInfo> ghostInfos) {
         // get the current position of PacMan (returns -1 in case you can't see PacMan)
         int currentPacmanIndex = game.getPacmanCurrentNodeIndex();
 
@@ -82,19 +87,18 @@ public class MyPacMan extends PacmanController {
         List<MOVE> possibleMoves = Arrays.asList(game.getPossibleMoves(currentPacmanIndex));
         List<MOVE> safeMoves = possibleMoves;
 
+
         //check if any ghosts are in the way if we are given that information
-        if (ghostPositions.length > 0 && edibleTime.length > 0) {
+        if (ghostInfos.size() > 0) {
             safeMoves = possibleMoves.stream()
                     //remove moves that would put us in danger (i.e. too close to a non-edible ghost)
                     .filter(move -> {
                         int neighbourIndex = game.getNeighbour(currentPacmanIndex, move);
 
                         //compute the minimum distance between pacman and any non-edible ghost
-                        int distance = IntStream.range(0, ghostPositions.length)
-                                .filter(ghostIndex -> ghostPositions[ghostIndex] >= 0)
-                                .filter(ghostIndex -> edibleTime[ghostIndex] == 0)
-                                .mapToObj(ghostIndex ->
-                                        (int) game.getDistance(neighbourIndex, ghostPositions[ghostIndex], Constants.DM.PATH))
+                        int distance = ghostInfos.values().stream()
+                                .filter(info -> info.getGhostPos() >= 0 && info.getEdibleTime() == 0)
+                                .map(info -> (int) game.getDistance(neighbourIndex, info.getGhostPos(), Constants.DM.PATH))
                                 .reduce(Integer.MAX_VALUE, Math::min);
 
                         //move is only safe if the nearest ghost is far away enough
@@ -136,7 +140,7 @@ public class MyPacMan extends PacmanController {
      */
     public MOVE mcts(Game game, long timeDue) {
         // create MCTSTree object for simulation
-        MCTSTree tree = new MCTSTree(game, ghostPos, edibleTime);
+        MCTSTree tree = new MCTSTree(game, ghostInfos);
         tree.simulate(timeDue);
 
         System.out.println("Tree: " + tree.getBestScore() + " Game:" + (game.getScore() + game.getPacmanNumberOfLivesRemaining() * 1000));
