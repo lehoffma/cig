@@ -1,6 +1,5 @@
 package entrants.ghosts.gzae;
 
-import entrants.pacman.gzae.Util;
 import pacman.controllers.IndividualGhostController;
 import pacman.game.Constants;
 import pacman.game.Game;
@@ -93,7 +92,7 @@ public class GenericGhost extends IndividualGhostController {
         //setup patrolling indices if not initialized yet
         if (this.currentJunctionIndex == -1) {
             int amountOfJunctions = game.getCurrentMaze().junctionIndices.length - 1;
-            this.currentJunctionIndex = amountOfJunctions / (Util.getGhostIndex(ghost) + 1);
+            this.currentJunctionIndex = (int) (Math.random()*amountOfJunctions);
         }
 
         // Can we see PacMan? If so tell people and update our info
