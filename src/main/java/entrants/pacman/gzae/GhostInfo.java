@@ -1,16 +1,16 @@
 package entrants.pacman.gzae;
 
 public class GhostInfo {
-    private int ghostPos = -1;
+    private int position = -1;
     private byte lastSeen = 0;
     private int edibleTime = 0;
 
-    public int getGhostPos() {
-        return ghostPos;
+    public int getPosition() {
+        return position;
     }
 
-    public GhostInfo setGhostPos(int ghostPos) {
-        this.ghostPos = ghostPos;
+    public GhostInfo setPosition(int position) {
+        this.position = position;
         return this;
     }
 

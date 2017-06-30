@@ -38,6 +38,7 @@ public class GenericGhost extends IndividualGhostController {
     /**
      * Initializes the ghost if it didn't happen already.
      * At the moment, this includes only the patrolling mechanism.
+     *
      * @param game the currently active game
      */
     private void initialize(Game game) {
@@ -213,7 +214,8 @@ public class GenericGhost extends IndividualGhostController {
     /**
      * Handles updating and initializing the internal game state (i.e. the ghost's and the pacman's position, etc.).
      * Based on this updated game state, an appropriate move is selected (either finding, chasing or running away from pacman)
-     * @param game the currently active game
+     *
+     * @param game    the currently active game
      * @param timeDue how much time we can spend at most
      * @return a move depending on the state of the game (or null if the ghost doesn't require an action)
      */

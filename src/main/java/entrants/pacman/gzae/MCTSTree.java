@@ -9,27 +9,44 @@ import pacman.game.info.GameInfo;
 import pacman.game.internal.Ghost;
 
 import java.util.*;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 import java.util.stream.Collectors;
 
 public class MCTSTree {
-
+    /**
+     * The game the simulations will be performed on (completely observable)
+     */
     private Game game;
-    private MASController ghosts;
-    private List<MCTSNode> simulatedMoves;
+    /**
+     * A controller for the ghosts which will be initialized with the observed infos from the pacman
+     */
+    private MASController ghosts = new POCommGhosts(50);
 
+    /**
+     * How many junctions we want to look ahead
+     */
     private static final int MAX_LOOKAHEAD = 3;
+    /**
+     * How often we want to simulate a move
+     */
     private static final int SIMULATIONS_PER_MOVE = 5;
 
-    private static final boolean DEBUG = false;
 
+    private final Logger LOGGER = Logger.getLogger(MCTSTree.class.getName());
+
+    /**
+     * @param game       the game the simulation should take place in
+     * @param ghostInfos a map containing observed infos (positions, edible times) about the ghosts in
+     *                   the currently active game
+     */
     public MCTSTree(Game game, Map<Constants.GHOST, GhostInfo> ghostInfos) {
-        Game completelyObservableGame;
         GameInfo info = game.getPopulatedGameInfo();
 
         // initialize ghosts with the information we have
         Arrays.stream(Constants.GHOST.values()).forEach(ghost -> {
             int ghostPos = Optional.ofNullable(ghostInfos.get(ghost))
-                    .map(GhostInfo::getGhostPos)
+                    .map(GhostInfo::getPosition)
                     .filter(pos -> pos >= 0)
                     .orElse(game.getCurrentMaze().lairNodeIndex);
             int edibleTime = Optional.ofNullable(ghostInfos.get(ghost)).map(GhostInfo::getEdibleTime).orElse(0);
@@ -37,64 +54,28 @@ public class MCTSTree {
             info.setGhost(ghost, new Ghost(ghost, ghostPos, edibleTime, -1, MOVE.NEUTRAL));
         });
 
-        completelyObservableGame = game.getGameFromInfo(info);
-
-        this.game = completelyObservableGame;
-
-        // Make some ghosts for simulation purposes
-        this.ghosts = new POCommGhosts(50);
-        simulatedMoves = new ArrayList<>();
+        this.game = game.getGameFromInfo(info);
     }
 
-
-    public void simulate(double timeDue) {
-        if (DEBUG) {
-            System.out.println("Start simulation");
-        }
-
-        // get all possible moves at the queried position
-        int currentPacmanIndex = game.getPacmanCurrentNodeIndex();
-        simulatedMoves = Arrays.stream(game.getPossibleMoves(currentPacmanIndex))
-                .map(MCTSNode::new)
-                .collect(Collectors.toList());
-
-        simulatedMoves.forEach(mctsNode -> {
-            mctsNode.doSimulations(game, ghosts, SIMULATIONS_PER_MOVE, MAX_LOOKAHEAD);
-            if (DEBUG) {
-                System.out.println(mctsNode.toString());
-            }
-        });
-    }
 
     /**
-     * Helper method for getBestMove() and getBestScore()
-     * @return the MCTSNode with the best score value
+     * Performs a simulation for every possible move pacman can perform.
+     *
+     * @param timeDue how much time is left in this tick
+     * @return the best move according to the simulations performed inside this method
      */
-    private MCTSNode getBestMoveNode(){
-        MCTSNode bestMoveNode = this.simulatedMoves.stream()
+    public MCTSNode simulate(double timeDue) {
+        LOGGER.log(Level.INFO, "Start simulation");
+
+        return Arrays
+                // get all possible moves at the queried position
+                .stream(game.getPossibleMoves(game.getPacmanCurrentNodeIndex()))
+                .map(MCTSNode::new)
+                //simulate the game
+                .map(mctsNode -> mctsNode.doSimulations(game, ghosts, SIMULATIONS_PER_MOVE, MAX_LOOKAHEAD))
+                .peek(mctsNode -> LOGGER.info(mctsNode.toString()))
+                //return the simulated move with the highest score
                 .reduce(new MCTSNode(MOVE.NEUTRAL),
                         (bestMoveYet, node) -> bestMoveYet.score > node.score ? bestMoveYet : node);
-
-        if(DEBUG){
-            System.out.println("best Move: " + bestMoveNode.move.name() + "| score: " + bestMoveNode.score);
-        }
-        return bestMoveNode;
     }
-
-    /**
-     *
-     * @return the MOVE enum of the MCTSNode with the best simulated score value
-     */
-    public MOVE getBestMove() {
-        return this.getBestMoveNode().move;
-    }
-
-    /**
-     * similar to best Move but return the score
-     * @return the score value of the MCTSNode with the best simulated score value
-     */
-    public double getBestScore() {
-        return this.getBestMoveNode().score;
-    }
-
 }

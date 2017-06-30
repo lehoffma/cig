@@ -6,6 +6,7 @@ public class Blinky extends GenericGhost {
 
 
     public Blinky() {
-        super(Constants.GHOST.BLINKY); }
+        super(Constants.GHOST.BLINKY);
+    }
 
 }
